@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "build": "webpack -p",
-    "start": "node server.js"
+    "start": "nodemon server.js"
   },
   "dependencies": {
     "@babel/core": "^7.11.6",
@@ -27,6 +27,7 @@
     "hbs": "^4.1.2",
     "lowdb": "^1.0.0",
     "node-fetch": "^2.6.1",
+    "nodemon": "^2.0.21",
     "sass": "^1.26.12",
     "sass-loader": "^10.0.2",
     "webpack": "^4.44.2",
