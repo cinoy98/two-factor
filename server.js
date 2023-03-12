@@ -41,11 +41,11 @@ app.use(
     resave: true,
     saveUninitialized: false,
     proxy: true,
-    cookie: {
-      httpOnly: true,
-      secure: true,
-      sameSite: "none"
-    }
+    // cookie: {
+    //   httpOnly: true,
+    //   secure: true,
+    //   sameSite: "none"
+    // }
   })
 );
 
@@ -117,6 +117,16 @@ app.get("/second-factor", (req, res) => {
 });
 
 app.use("/auth", auth);
+
+app.get('/showSessionValues', function(req, res,next) {
+  // Get the values of the session variables
+  let sessionDetails = req.session;
+  console.log("current session data")
+  console.table(sessionDetails)
+
+  console.log("environment variables",process.env)
+  next()
+});
 
 const port = process.env.GLITCH_DEBUGGER ? null : 8080;
 const listener = app.listen(port || process.env.PORT, () => {

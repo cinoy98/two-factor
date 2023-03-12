@@ -86,6 +86,7 @@
           // Rename it
           await rename(newCredential.credId);
         } catch (e) {
+          console.error(e)
           // Alert the user that something went wrong
           if (Array.isArray(e)) {
             alert(
