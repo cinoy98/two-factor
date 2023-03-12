@@ -41,11 +41,11 @@ app.use(
     resave: true,
     saveUninitialized: false,
     proxy: true,
-    cookie: {
-      httpOnly: true,
-      secure: true,
-      sameSite: "none"
-    }
+    // cookie: {
+    //   httpOnly: true,
+    //   secure: true,
+    //   sameSite: "none"
+    // }
   })
 );
 
