@@ -87,6 +87,7 @@
           await rename(newCredential.credId);
         } catch (e) {
           // Alert the user that something went wrong
+          console.error(e)
           if (Array.isArray(e)) {
             alert(
               // `msg` not `message`, this is the key's name as per the express validator API
