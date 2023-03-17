@@ -22,16 +22,13 @@ import {
   
   const notConfiguredHtml = html`
     <p>
-      ✖️ Two-factor authentication is not configured (no credentials found). To
-      make your account more secure, enable two-factor authentication by adding a
-      credential.
+      ✖️ Two-factor authentication is not configured 
     </p>
   `;
   
   const configuredHtml = html`
     <p>
-      ✅ Two-factor authentication with a security key is configured.<br/>
-      We recommend you create more than one credential, so that you're not locked out of your account in case you lose a security key.
+      ✅ Two-factor authentication with a security key is configured
     </p>
   `;
   
