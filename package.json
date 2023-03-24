@@ -1,7 +1,7 @@
 {
-  "name": "webauthn-2fa",
+  "name": "main-project",
   "version": "0.0.1",
-  "description": "A simple Node app built on Express, instantly up and running.",
+  "description": "",
   "main": "server.js",
   "scripts": {
     "build": "webpack -p",
@@ -35,14 +35,5 @@
   },
   "engines": {
     "node": "14.x"
-  },
-  "repository": {
-    "url": "https://github.com/googlecodelabs/fido2-codelab"
-  },
-  "license": "MIT",
-  "keywords": [
-    "node",
-    "glitch",
-    "express"
-  ]
+  }
 }

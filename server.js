@@ -1,19 +1,3 @@
-/*
- * @license
- * Copyright 2021 Google Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     https://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License
- */
 
 const express = require("express");
 const session = require("express-session");
@@ -58,11 +42,8 @@ function isAwaitingSecondFactor(req) {
 }
 
 app.use((req, res, next) => {
-  if (process.env.PROJECT_DOMAIN) {
-    process.env.HOSTNAME = `${process.env.PROJECT_DOMAIN}.glitch.me`;
-  } else {
-    process.env.HOSTNAME = req.headers.host;
-  }
+
+  process.env.HOSTNAME = req.headers.host;
   const protocol = /^localhost/.test(process.env.HOSTNAME) ? "http" : "https";
   process.env.ORIGIN = `${protocol}://${process.env.HOSTNAME}`;
   if (
@@ -118,17 +99,17 @@ app.get("/second-factor", (req, res) => {
 
 app.use("/auth", auth);
 
-app.get('/showSessionValues', function(req, res,next) {
+app.get('/showSessionValues', function (req, res, next) {
   // Get the values of the session variables
   let sessionDetails = req.session;
   console.log("current session data")
   console.table(sessionDetails)
 
-  console.log("environment variables",process.env)
+  console.log("environment variables", process.env)
   next()
 });
 
-const port = process.env.GLITCH_DEBUGGER ? null : 8080;
+const port = 8080;
 const listener = app.listen(port || process.env.PORT, () => {
   console.log("Your app is listening on port " + listener.address().port);
 });
