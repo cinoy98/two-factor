@@ -6,13 +6,13 @@ import {
   
   const notConfiguredHtml = html`
     <p>
-      ✖️ Two-factor authentication is not configured 
+       Two-factor authentication is not configured 
     </p>
   `;
   
   const configuredHtml = html`
     <p>
-      ✅ Two-factor authentication with a security key is configured
+       Two-factor authentication with a security key is configured
     </p>
   `;
   
@@ -49,14 +49,14 @@ import {
             @click="${renameEl}"
             class="secondary right"
           >
-            ✏️ Rename
+             Rename
           </button>
           <button
             data-credential-id="${credId}"
             @click="${removeEl}"
             class="secondary remove right"
           >
-            🗑 Remove
+             Remove
           </button>
         </div>
       </div>

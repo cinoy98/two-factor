@@ -29,7 +29,7 @@ db.defaults({
 
 // WebAuthn settings
 const authSettings = Object.freeze({
-  RP_NAME: "webauthn-2fa",
+  RP_NAME: "main-project",
   FIDO_TIMEOUT: 30 * 1000 * 60,
   // Use "cross-platform" for roaming keys (= physical)
   AUTHENTICATOR_ATTACHEMENT: "cross-platform",
@@ -104,38 +104,6 @@ function getOrigin(userAgent) {
 // Database management and actions
 // ----------------------------------------------------------------------------
 
-function resetDb() {
-  db.get("users")
-    .remove({})
-    .write();
-}
-
-// function findUserByUsername(username) {
-//   return db
-//     .get("users")
-//     .find({ username })
-//     .value();
-// }
-
-// function createUser(user) {
-//   db.get("users")
-//     .push(user)
-//     .write();
-// }
-
-// function updateUser(username, user) {
-//   db.get("users")
-//     .find({ username })
-//     .assign(user)
-//     .write();
-// }
-
-// function updateCredentials(username, credentials) {
-//   db.get("users")
-//     .find({ username })
-//     .assign({ credentials })
-//     .write();
-// }
 
 async function findUserByUsername(username) {
 
@@ -186,26 +154,7 @@ router.get("/signout", (req, res) => {
   res.redirect(307, "/");
 });
 
-/**
- * Complete the authentication
- *
- * Input:
- * req.session:
- * {
-     username: String,
-     isPasswordCorrect: String
- * }
- *
- * Response as JSON:
- * {
-     msg: String, 
-     authStatus: String // One of authStatuses 
-   }
- * or
- * {
-     error: String, 
-   }
- **/
+
 function completeAuthentication(req, res) {
   // username and isPasswordCorrect come from the bootstrapping session, named 'auth', and dedicated to authentication
   const { username, isPasswordCorrect } = req.session;
@@ -228,31 +177,7 @@ function completeAuthentication(req, res) {
   });
 }
 
-/**
- * Initialize the authentication: trigger completion or request a second factor, depending on the user's chosen authentication type
- *
- * Input:
- * req.body:
- * {
-     username: String,
-     password: String,
- * }
- * req.session:
- * {
-     username: String,
-     ...
- * }
- *
- * Response as JSON:
- * {
-     msg: String, 
-     authStatus: String // One of authStatuses 
-   }
- * or
- * {
-     error: String, 
-   }
- **/
+
 router.post(
   "/initialize-authentication",
   check("username")
@@ -298,23 +223,7 @@ router.post(
   }
 );
 
-/**
- * Get options that are required to call navigator.credential.get()
- *
- * Input:
- * req.body: similar format as output
- *
- * Response:
- * {
-     challenge: String,
-     userVerification: String, // ('required'|'preferred'|'discouraged'),
-     allowCredentials: [{
-       id: String,
-       type: 'public-key',
-       transports: String[], // One or several of https://www.w3.org/TR/webauthn-2/#dom-publickeycredentialdescriptor-transports 
-     }, ...]
- * }```
- **/
+
 router.post("/two-factor-options", csrfCheck, async (req, res) => {
   try {
     const user = await findUserByUsername(req.session.username);
@@ -345,23 +254,7 @@ router.post("/two-factor-options", csrfCheck, async (req, res) => {
   }
 });
 
-/**
- * Authenticate the user
- *
- * Input:
- * req.body.credential:
- * {
-     id: String,
-     type: String, // E,g. 'public-key'
-     rawId: String,
-     response: {
-       clientDataJSON: String,
-       authenticatorData: String,
-       signature: String,
-       userHandle: String
-     }
- * }
- **/
+
 router.post("/authenticate-two-factor", csrfCheck, async (req, res) => {
   const { body } = req;
   const { credential: credentialFromClient } = body;
@@ -413,51 +306,14 @@ router.post("/authenticate-two-factor", csrfCheck, async (req, res) => {
 // Credential management
 // ----------------------------------------------------------------------------
 
-/**
- * Return a user and their credentials
- *
- * Input:
- * req.session:
- * {
-     username: String,
-     ...
- * }
- *
- * Response:
- * {
-    username: String,
-    credentials: Credential[]
- * }
- * Credential:
- * {
-    credId: String,
-    publicKey: String,
-    aaguid: String,
- * }
-**/
+
 router.get("/credentials", csrfCheck, sessionCheck, async(req, res) => {
   const { username } = req.session;
   const user = await findUserByUsername(username);
   res.status(200).json(user || {});
 });
 
-/**
- * Remove a credential attached to the user
- *
- * Input:
- * req.session:
- * {
-     username: String,
-     ...
- * }
- * req.query:
- * {
-     credId: String,
-     ...
- * }
- *
- * Response: empty JSON
- **/
+
 router.delete("/credential", csrfCheck, sessionCheck, async(req, res) => {
   const { credId } = req.query;
   const { username } = req.session;
@@ -469,25 +325,7 @@ router.delete("/credential", csrfCheck, sessionCheck, async(req, res) => {
   res.status(200).json(user || {});
 });
 
-/**
- * Update an existing credential's name
- *
- * Input:
- * req.session:
- * {
-     username: String,
-     ...
- * }
- * req.query:
- * {
-     name: String,
-     credId: String,
-     ...
- * }
- *
- * Response: 
- * User as JSON string
- **/
+
 router.put(
   "/credential",
   csrfCheck,
@@ -525,33 +363,7 @@ router.put(
   }
 );
 
-/**
- * Register a new credential
- *
- * Input: 
- * req.session:
- * {
-     challenge: String,
-     username: String,
-     ...
- * }
- * req.body:
- * {
-     id: String, // New credential's ID
-     type: String, // E.g. 'public-key'
-     rawId: ArrayBuffer,
-     response: {
-       clientDataJSON: String, 
-       attestationObject: String, 
-       signature: String, 
-       userHandle: String, 
-     }
-     transports: String[], // One or several of https://www.w3.org/TR/webauthn-2/#dom-publickeycredentialdescriptor-transports 
- * }
- * 
- * Response: 
- * User as JSON string
- **/
+
 router.post(
   "/credential",
   csrfCheck,
@@ -613,45 +425,7 @@ router.post(
   }
 );
 
-/**
- * Get options that are required to call navigator.credential.create()
- *
- * Input: 
- * req.session:
- * {
-     username: String,
-     ...
- * }
- *
- * Response: 
- * {
-     rp: {
-       id: String,
-       name: String
-     },
-     user: {
-       displayName: String,
-       id: String,
-       name: String
-     },
-     publicKeyCredParams: [{
-       type: 'public-key', alg: -7
-     }],
-     timeout: Number,
-     challenge: String,
-     excludeCredentials: [{
-       id: String,
-       type: 'public-key',
-       transports: String[], // One or several of https://www.w3.org/TR/webauthn-2/#dom-publickeycredentialdescriptor-transports 
-     }, ...],
-     authenticatorSelection: {
-       authenticatorAttachment: String,
-       requireResidentKey: String,
-       userVerification: String // 'required'|'preferred'|'discouraged'
-     },
-     attestation: String // 'none'|'indirect'|'direct'
- * }
- **/
+
 router.post(
   "/credential-options",
   csrfCheck,
@@ -687,7 +461,7 @@ router.post(
           requireResidentKey: authSettings.REQUIRE_RESIDENT_KEY,
           userVerification: authSettings.USER_VERIFICATION
         },
-        // As per https://www.w3.org/TR/webauthn-2/
+
         pubKeyCredParams: [
           {
             type: "public-key",
