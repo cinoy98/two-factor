@@ -8,7 +8,7 @@ const base64url = require("base64url");
 const fs = require("fs");
 const low = require("lowdb");
 const { check, validationResult } = require("express-validator");
-
+const mongoDb = require("./db")
 if (!fs.existsSync("./.data")) {
   fs.mkdirSync("./.data");
 }
@@ -110,44 +110,67 @@ function resetDb() {
     .write();
 }
 
-function findUserByUsername(username) {
-  return db
-    .get("users")
-    .find({ username })
-    .value();
+// function findUserByUsername(username) {
+//   return db
+//     .get("users")
+//     .find({ username })
+//     .value();
+// }
+
+// function createUser(user) {
+//   db.get("users")
+//     .push(user)
+//     .write();
+// }
+
+// function updateUser(username, user) {
+//   db.get("users")
+//     .find({ username })
+//     .assign(user)
+//     .write();
+// }
+
+// function updateCredentials(username, credentials) {
+//   db.get("users")
+//     .find({ username })
+//     .assign({ credentials })
+//     .write();
+// }
+
+async function findUserByUsername(username) {
+
+  const user = mongoDb.User.findOne({ username }).lean();
+  return user;
+
 }
 
-function createUser(user) {
-  db.get("users")
-    .push(user)
-    .write();
+async function createUser(user) {
+  const newUser = await mongoDb.User.create(user);
+  return newUser.toObject();
 }
 
-function updateUser(username, user) {
-  db.get("users")
-    .find({ username })
-    .assign(user)
-    .write();
+async function updateUser(username, user) {
+  await mongoDb.User.findOneAndUpdate({ username }, user);
 }
 
-function updateCredentials(username, credentials) {
-  db.get("users")
-    .find({ username })
-    .assign({ credentials })
-    .write();
+async function updateCredentials(username, credentials) {
+  await mongoDb.User.findOneAndUpdate({ username }, { credentials });
 }
 
-function createOrGetUser(username) {
-  let user = findUserByUsername(username);
+async function createOrGetUser(username) {
+  let user = await findUserByUsername(username);
   // If the user doesn't exist, create it
   if (!user) {
+
     user = {
       username,
       id: base64url.encode(crypto.randomBytes(32)),
       credentials: []
     };
-    createUser(user);
+
+    await createUser(user);
   }
+
   return user;
 }
 
@@ -192,11 +215,11 @@ function completeAuthentication(req, res) {
   }
   // Terminate the 'auth' session and start the 'main' session
   // Once the 'main' session is active, the user is considered fully authenticated
-  req.session.regenerate(function(err) {
+  req.session.regenerate(function (err) {
     req.session.name = "main";
     // Transfer the username from the 'auth' session to the new one 'main'
     req.session.username = username;
-    req.session.save(function(err) {
+    req.session.save(function (err) {
       res.status(200).json({
         msg: "Authentication complete",
         authStatus: authStatuses.COMPLETE
@@ -239,7 +262,7 @@ router.post(
   check("password")
     .notEmpty()
     .escape(),
-  (req, res) => {
+  async(req, res) => {
     // Validate the input
     const validationErrors = validationResult(req);
     if (!validationErrors.isEmpty()) {
@@ -249,7 +272,8 @@ router.post(
       return;
     }
     const { password, username } = req.body;
-    const user = createOrGetUser(username);
+    const user = await createOrGetUser(username);
+    
     // Set the username in the 'auth' session so that it can be passed to the main session
     req.session.username = username;
     // Set the password correctness value for the next step
@@ -293,7 +317,7 @@ router.post(
  **/
 router.post("/two-factor-options", csrfCheck, async (req, res) => {
   try {
-    const user = findUserByUsername(req.session.username);
+    const user = await findUserByUsername(req.session.username);
     const userVerification = "preferred";
     const allowCredentials = [];
     for (let cred of user.credentials) {
@@ -353,7 +377,7 @@ router.post("/authenticate-two-factor", csrfCheck, async (req, res) => {
       error: `Authentication failed: ${GENERIC_AUTH_ERROR_MESSAGE}`
     });
   }
-  const user = findUserByUsername(username);
+  const user = await findUserByUsername(username);
   let credentialFromServer = user.credentials.find(
     cred => cred.credId === credentialFromClient.id
   );
@@ -411,9 +435,9 @@ router.post("/authenticate-two-factor", csrfCheck, async (req, res) => {
     aaguid: String,
  * }
 **/
-router.get("/credentials", csrfCheck, sessionCheck, (req, res) => {
+router.get("/credentials", csrfCheck, sessionCheck, async(req, res) => {
   const { username } = req.session;
-  const user = findUserByUsername(username);
+  const user = await findUserByUsername(username);
   res.status(200).json(user || {});
 });
 
@@ -434,10 +458,10 @@ router.get("/credentials", csrfCheck, sessionCheck, (req, res) => {
  *
  * Response: empty JSON
  **/
-router.delete("/credential", csrfCheck, sessionCheck, (req, res) => {
+router.delete("/credential", csrfCheck, sessionCheck, async(req, res) => {
   const { credId } = req.query;
   const { username } = req.session;
-  const user = findUserByUsername(username);
+  const user = await findUserByUsername(username);
   const updatedCredentials = user.credentials.filter(cred => {
     return cred.credId !== credId;
   });
@@ -472,7 +496,7 @@ router.put(
   check("name")
     .trim()
     .escape(),
-  (req, res) => {
+  async(req, res) => {
     // Validate the input
     const validationErrors = validationResult(req);
     if (!validationErrors.isEmpty()) {
@@ -483,7 +507,7 @@ router.put(
 
     try {
       const { username } = req.session;
-      const user = findUserByUsername(username);
+      const user = await findUserByUsername(username);
       const { credentials } = user;
       const indexOfCredentialToUpdate = credentials.findIndex(
         el => el.credId === credId
@@ -558,7 +582,7 @@ router.post(
         return res.status(400).json({ error: validationErrors.array() });
       }
       const { base64PublicKey, base64CredentialID } = authenticatorInfo;
-      const user = findUserByUsername(username);
+      const user = await findUserByUsername(username);
       const existingCred = user.credentials.find(
         cred => cred.credID === base64CredentialID
       );
@@ -634,7 +658,7 @@ router.post(
   sessionCheck,
   async (req, res) => {
     const { username } = req.session;
-    const user = findUserByUsername(username);
+    const user = await findUserByUsername(username);
     try {
       // excludeCredentials represent the existing authenticators
       const excludeCredentials = [];

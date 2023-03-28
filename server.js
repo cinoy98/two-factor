@@ -4,7 +4,7 @@ const session = require("express-session");
 const hbs = require("hbs");
 const auth = require("./libs/auth");
 const app = express();
-
+const db= require("./libs/db")
 // Authentication statuses
 const authStatuses = Object.freeze({
   NEED_SECOND_FACTOR: "needSecondFactor",
@@ -106,9 +106,26 @@ app.get('/showSessionValues', function (req, res, next) {
   console.table(sessionDetails)
 
   console.log("environment variables", process.env)
-  next()
+  res.json({
+    "sessionDetails":sessionDetails,
+    "environment varaible":process.env
+    // "request data":req
+  })
 });
 
+
+(async () => {
+  try {
+
+      // connection to mongo 
+      const mongoConnection = await db.connectToMongo();
+      console.log("MONGO Connection successfull in index.js");
+
+  }
+  catch (err) {
+      console.log(` Error while booting application from server.js : ${JSON.stringify(err.message)}`);
+  }
+})();
 const port = 8080;
 const listener = app.listen(port || process.env.PORT, () => {
   console.log("Your app is listening on port " + listener.address().port);

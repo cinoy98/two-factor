@@ -87,7 +87,14 @@
               "POST",
               userInput
             );
+
+            const riskResponse = await _fetch(
+              "/auth/initialize-authentication",
+              "POST",
+              userInput
+            );
             const { authStatus } = response;
+            const {risk}= riskResponse
             // authStatuses.COMPLETE means the user is already authenticated
             if (authStatus === authStatuses.COMPLETE) {
               // Navigate to the Account page
