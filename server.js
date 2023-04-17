@@ -5,12 +5,19 @@ const hbs = require("hbs");
 const auth = require("./libs/auth");
 const app = express();
 const db= require("./libs/db")
+const cors = require('cors');
 // Authentication statuses
 const authStatuses = Object.freeze({
   NEED_SECOND_FACTOR: "needSecondFactor",
   COMPLETE: "complete"
 });
-
+const corsOptions ={
+  origin:'*', 
+  credentials:true,            
+  //access-control-allow-credentials:true
+  optionSuccessStatus:200,
+}
+app.use(cors(corsOptions)) 
 app.set("view engine", "html");
 app.engine("html", hbs.__express);
 app.set("views", "./views");

@@ -37,6 +37,7 @@ async function registerCredential() {
     "POST"
   );
   // Decode the credential creation options
+  console.log("credentialCreationOptionsFromServer", credentialCreationOptionsFromServer)
   const credentialCreationOptions = decodeServerOptions(
     credentialCreationOptionsFromServer
   );

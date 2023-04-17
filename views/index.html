@@ -1,106 +1,135 @@
-
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <title>Main Project</title>
 
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="/style.css" />
+<head>
+  <title>Main Project</title>
 
-  </head>
-  <body>
-    <div id="warningbanner" class="invisible">
-       browser doesn't support WebAuthn
-    </div>
-    <main class="content">
-      <h2>
-       Sign in
-      </h2>
-      <form id="form">
-        <div class="flex-h">
-          <div>
-            <label>username</label>
-            <input
-              type="text"
-              name="username"
-              autocomplete="username"
-              autofocus
-            />
-          </div>
-          <div>
-            <label>password</label>
-            <input
-              type="password"
-              name="password"
-              autocomplete="current-password"
-            />
-          </div>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/style.css" />
+
+</head>
+
+<body>
+  <div id="warningbanner" class="invisible">
+    browser doesn't support WebAuthn
+  </div>
+  <main class="content">
+    <h2>
+      Sign in
+    </h2>
+    <form id="form">
+      <div class="flex-h">
+        <div>
+          <label>username</label>
+          <input type="text" name="username" autocomplete="username" autofocus />
         </div>
-        <input type="submit" class="button right" value="Next" />
-      </form>
-      <script type="module">
-        import { _fetch, authStatuses } from "/auth.client.js";
+        <div>
+          <label>password</label>
+          <input type="password" name="password" autocomplete="current-password" />
+        </div>
+      </div>
+      <select id="riskCategory" name="riskCategory">
+        <option value="Genuine">Genuine</option>
+        <option value="Suspicious">Suspicious</option>
+        <option value="Attacker">Attacker</option>
+      </select>
+      <input type="submit" class="button right" value="Next" />
+    </form>
 
-        // Display a banner in browsers that don't support WebAuthn
-        if (!window.PublicKeyCredential) {
-          document
-            .querySelector("#warningbanner")
-            .classList.remove("invisible");
-        }
 
-        // Listen to form submission
-        const form = document.querySelector("#form");
-        form.addEventListener("submit", async e => {
-          e.preventDefault();
+    <script type="module">
+      import { _fetch, authStatuses } from "/auth.client.js";
 
-          // Retrieve the form data
-          const userInput = {};
-          const formData = new FormData(e.target);
-          formData.forEach((v, k) => (userInput[k] = v));
+      // Display a banner in browsers that don't support WebAuthn
+      if (!window.PublicKeyCredential) {
+        document
+          .querySelector("#warningbanner")
+          .classList.remove("invisible");
+      }
 
-          try {
-            // Initialize the authentication
-            const response = await _fetch(
-              "/auth/initialize-authentication",
-              "POST",
-              userInput
-            );
+      // Listen to form submission
+      const form = document.querySelector("#form");
+      form.addEventListener("submit", async e => {
+        e.preventDefault();
 
-            const riskResponse = await _fetch(
-              "/auth/initialize-authentication",
-              "POST",
-              userInput
-            );
-            const { authStatus } = response;
-            const {risk}= riskResponse
-            // authStatuses.COMPLETE means the user is already authenticated
-            if (authStatus === authStatuses.COMPLETE) {
+        // Retrieve the form data
+
+        const userInput = {};
+        const formData = new FormData(e.target);
+        formData.forEach((v, k) => (userInput[k] = v));
+
+        try {
+          // Initialize the authentication
+          const response = await _fetch(
+            "/auth/initialize-authentication",
+            "POST",
+            userInput
+          );
+
+
+          const { authStatus, riskStatus } = response;
+          console.log("current riskStatus : ", riskStatus)
+          console.log("current authStatus : ", authStatus)
+
+          // const {risk}= riskResponse
+          // authStatuses.COMPLETE means the user is already authenticated
+          if (authStatus === authStatuses.COMPLETE) {
+
+            if (riskStatus == "LOW") {
               // Navigate to the Account page
               location.href = "/account";
-              // authStatuses.NEED_SECOND_FACTOR means the user has set up two-factor-auth and has not entered a second actor yet
-            } else if (authStatus === authStatuses.NEED_SECOND_FACTOR) {
+            }
+            else if (riskStatus == "MEDIUM") {
+              // Navigate to the Account page
+              location.href = "/account";
+            }
+            else if (riskStatus == "HIGH") {
+              console.log("high risk detected")
+              // Navigate to the Account page
+              alert(`Login attempt with high risk`);
+              // location.href = "/";
+            }
+
+            // authStatuses.NEED_SECOND_FACTOR means the user has set up two-factor-auth and has not entered a second actor yet
+          } else if (authStatus === authStatuses.NEED_SECOND_FACTOR) {
+
+            if (riskStatus == "LOW") {
+              // Navigate to the Account page
+              location.href = "/account";
+            }
+            else if (riskStatus == "MEDIUM") {
+              alert(`Suspicious login attempt, please verify using two factor`);
               // Navigate to the 2FA page to get the second facto
               location.href = "/second-factor";
             }
-          } catch (e) {
-            // If something went wrong, empty the form, for convenience
-            form.reset();
-            // Alert the user that something went wrong
-            if (Array.isArray(e)) {
-              alert(
-                // `msg` not `message`, since this is the key's name as per the express validator API
-                `Authentication failed. ${e.map(
-                  err => `${err.msg} (${err.param})`
-                )}`
-              );
-            } else {
-              alert(`Authentication failed. ${e}`);
+            else if (riskStatus == "HIGH") {
+              // Navigate to the Account page
+              console.log("high risk detected")
+              alert(`Login attempt with high risk`);
+              // location.href = "/";
             }
+
           }
-        });
-      </script>
-    </main>
-  </body>
+        } catch (e) {
+          // If something went wrong, empty the form, for convenience
+          form.reset();
+          // Alert the user that something went wrong
+          if (Array.isArray(e)) {
+            alert(
+              // `msg` not `message`, since this is the key's name as per the express validator API
+              `Authentication failed. ${e.map(
+                err => `${err.msg} (${err.param})`
+              )}`
+            );
+          } else {
+            alert(`Authentication failed. ${e}`);
+          }
+        }
+      });
+    </script>
+  </main>
+</body>
+
 </html>

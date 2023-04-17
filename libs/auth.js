@@ -5,23 +5,12 @@ const router = express.Router();
 const crypto = require("crypto");
 const fido2 = require("@simplewebauthn/server");
 const base64url = require("base64url");
-const fs = require("fs");
-const low = require("lowdb");
 const { check, validationResult } = require("express-validator");
 const mongoDb = require("./db")
-if (!fs.existsSync("./.data")) {
-  fs.mkdirSync("./.data");
-}
-
-const FileSync = require("lowdb/adapters/FileSync");
-const adapter = new FileSync(".data/db.json");
-const db = low(adapter);
 
 router.use(express.json());
 
-db.defaults({
-  users: []
-}).write();
+
 
 // ----------------------------------------------------------------------------
 // Configuration
@@ -162,6 +151,7 @@ function completeAuthentication(req, res) {
     res.status(401).json({ error: GENERIC_AUTH_ERROR_MESSAGE });
     return;
   }
+  const risk = req.session.risk;
   // Terminate the 'auth' session and start the 'main' session
   // Once the 'main' session is active, the user is considered fully authenticated
   req.session.regenerate(function (err) {
@@ -171,7 +161,8 @@ function completeAuthentication(req, res) {
     req.session.save(function (err) {
       res.status(200).json({
         msg: "Authentication complete",
-        authStatus: authStatuses.COMPLETE
+        authStatus: authStatuses.COMPLETE,
+        riskStatus: risk
       });
     });
   });
@@ -187,7 +178,7 @@ router.post(
   check("password")
     .notEmpty()
     .escape(),
-  async(req, res) => {
+  async (req, res) => {
     // Validate the input
     const validationErrors = validationResult(req);
     if (!validationErrors.isEmpty()) {
@@ -196,11 +187,81 @@ router.post(
       });
       return;
     }
-    const { password, username } = req.body;
+    const { password, username, riskCategory } = req.body;
     const user = await createOrGetUser(username);
-    
+
+    const sampleUser = {
+      Attacker: {
+        "time": "2021-02-28 23:58:40.083",
+        "UserID": "-4324475583306591935",
+        "Rtt": 1748.0,
+        "IPAddress": "103.148.128.209",
+        "Country": "PK",
+        "Region": "Punjab",
+        "City": "Jaranwala",
+        "asn": 29492,
+        "UserAgentString": "Mozilla/5.0  (Linux; U; Android 2.2) Gecko/20150101 Firefox/20.0.0.1602 (Chrome",
+        "Browser": "Firefox 20.0.0.1602",
+        "os": "Android 2.2",
+        "Device": "mobile",
+        "LoginSuccessful": 0,
+        "IsAttackIP": 1
+      },
+      Suspicious: {
+        "time": "2020-02-03 12:44:30.475",
+        "UserID": "5508122890022967325",
+        "Rtt": 450.0,
+        "IPAddress": "10.0.8.75",
+        "Country": "NO",
+        "Region": "Oslo County",
+        "City": "Oslo",
+        "asn": 29492,
+        "UserAgentString": "Mozilla/5.0  (Linux; Android 5.5.1; CHM-U01) AppleWebKit/537.36 (KHTML, like Gecko Version/4.0 Chrome/30.0.0.2265.2272.0 Mobile Safari/537.36 SVN/060FSG2",
+        "Browser": "Chrome Mobile WebView 30.0.0.2265.2272",
+        "os": "Android 5.5.1",
+        "Device": "mobile",
+        "LoginSuccessful": false,
+        "IsAttackIP": true,
+        "IsAccountTakeover": false
+      },
+      Genuine: {
+        "time": "2021-02-28 14:58:40.083",
+        "UserID": "-5899288722986259008",
+        "Rtt": 518,
+        "IPAddress": "46.212.66.182",
+        "Country": "NO",
+        "Region": "Oslo County",
+        "City": "Oslo",
+        "asn": 41164,
+        "UserAgentString": "Mozilla/5.0  (Linux; U; Android 5.4.3; en-us; GT-I9060 Build/JDQ39) AppleWebKit/533.1 (KHTML, like Gecko Version/4.0 Mobile Safari/533.1 variation/69385",
+        "Browser": "Android 2.3.3.2660",
+        "os": "Android 5.4.3",
+        "Device": "mobile",
+        "LoginSuccessful": 1,
+        "IsAttackIP": 0
+      }
+    }
     // Set the username in the 'auth' session so that it can be passed to the main session
     req.session.username = username;
+    let risk;
+    let riskInput = sampleUser[riskCategory]
+    const riskResponse = await mongoDb.fetchData(riskInput);
+    console.log("riskResponse in auth.js", JSON.stringify(riskResponse))
+    const anomaly = riskResponse.anomaly[0];
+    const score = riskResponse.score[0];
+    if (anomaly == -1) {
+      risk = "HIGH"
+    }
+    else {
+      if (score > 0.14) {
+        risk = "LOW"
+      }
+      else {
+        risk = "MEDIUM"
+      }
+    }
+    req.session.risk = risk
+    console.log("risk in session", risk)
     // Set the password correctness value for the next step
     req.session.isPasswordCorrect = isPasswordCorrect(username, password);
     // If 2FA is not set up, complete the authentication
@@ -209,14 +270,30 @@ router.post(
       completeAuthentication(req, res);
       // If 2FA is set up, respond with a signal that the second factor is missing
     } else if (authType === authTypes.TWO_FACTOR) {
-      // Set the authStatus in the session so that it can be checked in server.js
-      req.session.authStatus = authStatuses.NEED_SECOND_FACTOR;
-      // And set it in the response so that it can be checked by the client
-      res.status(200).json({
-        msg:
-          "Need two factors because two-factor-authentication was configured for this account",
-        authStatus: authStatuses.NEED_SECOND_FACTOR
-      });
+      if (risk == "MEDIUM") {
+        // Set the authStatus in the session so that it can be checked in server.js
+        req.session.authStatus = authStatuses.NEED_SECOND_FACTOR;
+        // And set it in the response so that it can be checked by the client
+        res.status(200).json({
+          msg:
+            "Need two factors because two-factor-authentication was configured for this account",
+          authStatus: authStatuses.NEED_SECOND_FACTOR,
+          riskStatus: risk
+        });
+      }
+      else if (risk == "LOW") {
+        completeAuthentication(req, res);
+      }
+      else if (risk == "HIGH") {
+       
+        // And set it in the response so that it can be checked by the client
+        res.status(200).json({
+          msg:
+            "HIGH RISK DETECTED",
+          authStatus: authStatuses.NEED_SECOND_FACTOR,
+          riskStatus: risk
+        });
+      }
     } else {
       res.status(500).json({ error: "Unkown authentication type" });
     }
@@ -307,14 +384,14 @@ router.post("/authenticate-two-factor", csrfCheck, async (req, res) => {
 // ----------------------------------------------------------------------------
 
 
-router.get("/credentials", csrfCheck, sessionCheck, async(req, res) => {
+router.get("/credentials", csrfCheck, sessionCheck, async (req, res) => {
   const { username } = req.session;
   const user = await findUserByUsername(username);
   res.status(200).json(user || {});
 });
 
 
-router.delete("/credential", csrfCheck, sessionCheck, async(req, res) => {
+router.delete("/credential", csrfCheck, sessionCheck, async (req, res) => {
   const { credId } = req.query;
   const { username } = req.session;
   const user = await findUserByUsername(username);
@@ -334,7 +411,7 @@ router.put(
   check("name")
     .trim()
     .escape(),
-  async(req, res) => {
+  async (req, res) => {
     // Validate the input
     const validationErrors = validationResult(req);
     if (!validationErrors.isEmpty()) {
